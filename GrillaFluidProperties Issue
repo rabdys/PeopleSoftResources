@@ -1,0 +1,6 @@
+1) Locate The ImgDisplay ActiveX control. It is in PT_HOME\bin\client\winx86\ImgDisplay.ocx
+
+2) Unregister it: open a command window, execute: regsvr32 /u PT_HOME\bin\client\winx86\ImgDisplay.ocx
+3) Re-register it: on the command window, execute: regsvr32 PT_HOME\bin\client\winx86\ImgDisplay.ocx
+
+Ejecutar y volver a carglas las tools
