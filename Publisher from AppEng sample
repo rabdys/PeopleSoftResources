@@ -1,0 +1,57 @@
+/***********************************************
+Actividad:          PROYECTO:         Autor:       Fecha:           Descripción:
+#001              EA_REQ_FE_005_OAF   Raul Barrios 20200415         Genera reporte de calculo IPC
+***********************************************/
+/* Inicio #001*/
+import PSXP_RPTDEFNMANAGER:*;
+import PSXP_XMLGEN:*;
+Local number &numFilas = 0;
+Local Rowset &rstData = CreateRowset(Record.EA_CALMESIPC);
+Local Rowset &rstPrint = CreateRowset(Record.EA_CALC_IPC_WRK);
+Local File &Fl_SchemaFile, &Fl_ReportFileXML;
+Local string &Where, &ReportIdDef, &ReportTemplate, &ReportFileName, &Str_ReportFileXMl, &Str_SchemaFile;
+/*Carga de datos procesados por numero de instancia  */
+&Where = "WHERE PRCSINSTANCE = :1 ";
+&numFilas = &rstData.Fill(&Where, EA_CALCIPC_AET.PROCESS_INSTANCE.Value);
+MessageBox(0, " ", 0, 0, "Instancia: " | EA_CALCIPC_AET.PROCESS_INSTANCE.Value | " numero lineas: " | String(&numFilas));
+
+If &numFilas > 0 Then
+   &rstPrint = &rstData;
+   &RptOutputDir = %FilePath;
+   &sLanguajeCD = %Language_User;
+   &RptTemplateName = "EA_CALC_IPC_1";
+   /*Create Schema*/
+   &rds = create PSXP_XMLGEN:RowSetDS(); /*package method*/
+   &mySchema = &rds.GetXSDSchema(&rstPrint);
+   &Str_SchemaFile = &RptOutputDir | "EA_CALC_IPC" | EA_CALCIPC_AET.PROCESS_INSTANCE.Value | ".xsd";
+   &Fl_SchemaFile = GetFile(&Str_SchemaFile, "W", %FilePath_Absolute);
+   &Fl_SchemaFile.WriteLine(&mySchema);
+   &Fl_SchemaFile.Close();
+   
+   /*Create data xml*/
+   &myXMLFile = &rds.GetXMLData(&rstPrint, &Str_SchemaFile);
+   &Str_ReportFileXMl = &RptOutputDir | "EA_CALC_IPC" | EA_CALCIPC_AET.PROCESS_INSTANCE.Value | ".xml";
+   &Fl_ReportFileXML = GetFile(&Str_ReportFileXMl, "W", "UTF8", %FilePath_Absolute);
+   &Fl_ReportFileXML.WriteLine(&myXMLFile);
+   &Fl_ReportFileXML.Close();
+   
+   /* Generación del reporte */
+   &ReportIdDef = "EA_CALC_IPC";
+   &ReportTemplate = "EA_CALC_IPC_1";
+   &ReportFileName = "Reporte_IPC" | EA_CALCIPC_AET.YEAR.Value | EA_CALCIPC_AET.EA_MES_IPC.Value | "_" | EA_CALCIPC_AET.PROCESS_INSTANCE.Value;
+   
+   &ReportId = create PSXP_RPTDEFNMANAGER:ReportDefn(&ReportIdDef);
+   &ReportId.Get();
+   rem  &ReportID.UseBurstValueAsOutputFileName = True;
+   &ReportId.SetRuntimeDataXMLFile(&Str_ReportFileXMl);
+   &ReportId.OutDestination = %FilePath;
+   MessageBox(0, "", 0, 0, %FilePath);
+   &ReportId.ReportFileName = &ReportFileName;
+   &ReportId.ProcessReport("", "ESP", %Date, "XLS");
+   &ReportId.Publish("", "", "", EA_CALCIPC_AET.PROCESS_INSTANCE.Value);
+Else
+   MessageBox(0, " ", 0, 0, "No hay datos para el reporte");
+End-If;
+
+MessageBox(0, " ", 0, 0, "Fin");
+/* Fin #001*/
