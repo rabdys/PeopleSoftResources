@@ -2,6 +2,7 @@
 Actividad:          PROYECTO:         Autor:       Fecha:           Descripción:
 #001              EA_REQ_FE_005_OAF   Raul Barrios 20200415         Genera reporte de calculo IPC
 ***********************************************/
+/*Configuration output vaklue = WEB*/
 /* Inicio #001*/
 import PSXP_RPTDEFNMANAGER:*;
 import PSXP_XMLGEN:*;
