@@ -1,0 +1,13 @@
+Rows per page (Examples 6 rows per pages)
+
+Define row counter variable in a form field
+<?xdoxslt:set_variable($_XDOCTX, ’Counter’, 0)?>
+
+Increment counter for each line (again in a form field)
+<?xdoxslt:set_variable($_XDOCTX, ’Counter’, xdoxslt:
+get_variable($_XDOCTX, ’Counter’) + 1)?>
+
+Break if the number of rows is reached (say 6 rows in this example)
+<?if: xdoxslt:get_variable($_XDOCTX, ’Counter’) mod 6=0?>
+<?split-by-page-break:?>
+<?end if?
