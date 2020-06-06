@@ -1,0 +1,20 @@
+Ronald Jose Hernandez de la Hoz
+Lun 9/09/2019 9:40 AM
+Raul Alonso Barrios Diaz (Entelgy)
+Local Rowset &Xlat;
+ 
+/*Inicio modificación 001*/
+&FLD = GetRecord(Record.CK_DERIVED_WRK).GetField(Field.RUNSTATUS);
+&FLD.ClearDropDownList();
+ 
+&Xlat = CreateRowset(Record.PSXLATITEM);
+&Xlat.Fill("WHERE Fill.FIELDNAME = 'RUNSTATUS' AND Fill.FIELDVALUE IN ('10','16','18','19','2','3','4','5','6','7','8','9') AND EFFDT = (SELECT MAX(EFFDT) FROM PSXLATITEM B WHERE B.FIELDNAME = Fill.FIELDNAME AND B.EFFDT <= SYSDATE)");
+ 
+&Xlat_cnt = &Xlat.ActiveRowCount;
+For &I = 1 To &Xlat_cnt
+   &CodeIn = &Xlat.GetRow(&I).GetRecord(1).FIELDVALUE.Value;
+   &DescIn = &Xlat.GetRow(&I).GetRecord(1).XLATLONGNAME.Value;
+  
+   &FLD.AddDropDownItem(&CodeIn, &DescIn);
+End-For;
+/*Fin modificación 001*/
