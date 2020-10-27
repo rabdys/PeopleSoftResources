@@ -4,17 +4,16 @@ Raul Alonso Barrios Diaz (Entelgy)
 Local Rowset &Xlat;
  
 /*Inicio modificación 001*/
-&FLD = GetRecord(Record.CK_DERIVED_WRK).GetField(Field.RUNSTATUS);
+&FLD = GetRecord(Record.PUJFACELE_RCNTL).GetField(Field.PUJ_FE_INV_TYPE);
 &FLD.ClearDropDownList();
- 
+
 &Xlat = CreateRowset(Record.PSXLATITEM);
-&Xlat.Fill("WHERE Fill.FIELDNAME = 'RUNSTATUS' AND Fill.FIELDVALUE IN ('10','16','18','19','2','3','4','5','6','7','8','9') AND EFFDT = (SELECT MAX(EFFDT) FROM PSXLATITEM B WHERE B.FIELDNAME = Fill.FIELDNAME AND B.EFFDT <= SYSDATE)");
- 
+&Xlat.Fill("WHERE Fill.FIELDNAME = 'PUJ_FE_INV_TYPE' AND Fill.FIELDVALUE IN ('MTR','NAC') AND EFFDT = (SELECT MAX(EFFDT) FROM SYSADM.PSXLATITEM B WHERE B.FIELDNAME = Fill.FIELDNAME AND Fill.FIELDVALUE  = B.FIELDVALUE AND B.EFFDT <= SYSDATE)");
+
 &Xlat_cnt = &Xlat.ActiveRowCount;
 For &I = 1 To &Xlat_cnt
    &CodeIn = &Xlat.GetRow(&I).GetRecord(1).FIELDVALUE.Value;
    &DescIn = &Xlat.GetRow(&I).GetRecord(1).XLATLONGNAME.Value;
-  
    &FLD.AddDropDownItem(&CodeIn, &DescIn);
 End-For;
 /*Fin modificación 001*/
