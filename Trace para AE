@@ -1,0 +1,4 @@
+ https://docs.oracle.com/cd/E99484_01/psft/pdf/pt857tape-b092018.pdf 202 
+ Setting Options to Trace a Specific Application Engine Program
+ -TRACE 7 -TOOLSTRACEPC 3652 - TOOLSTRACESQL 131
+ 
