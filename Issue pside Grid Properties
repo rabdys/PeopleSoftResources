@@ -1,0 +1,12 @@
+SOLUTION 1 
+Isntall workstation whit the config tool
+
+SOLUTION 2
+Install 
+C:\PT8.57\setup\psvccrt\vcredist_x64.exe
+
+SOLUTION 3
+1. Open command prompt (run as administrator)
+2. regsvr32 /U "C:\Apps\PTools85713\BIN\CLIENT\winx86\ImgDisplay.ocx"
+3. regsvr32  "C:\Apps\PTools85713\BIN\CLIENT\winx86\ImgDisplay.ocx"
+4. Try to access grid properties again
