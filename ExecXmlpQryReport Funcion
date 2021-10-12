@@ -1,0 +1,242 @@
+import PSXP_RPTDEFNMANAGER:*;
+
+/*It runs the BIP with a query as source*/
+Function ExecXmlpQryReport(&RunControlId As string, &ProcessInstance As number, &PromptRec As string, &ReportName As string, &TemplateId As string, &AsOfDate As date, &OutDestFormat As number, &OnlineFlag As boolean, &ContextRecord As Record) Returns boolean
+   Local PSXP_RPTDEFNMANAGER:ReportDefn &oRptDefn;
+   Local Record &rcdQryPrompts, &rcdQryRunParms;
+   Local SQL &sqlSelectQryParms;
+   Local number &i, &j;
+   Local ApiObject &PSMessages;
+   Local number &MsgSetNbr, &MsgNbr;
+   Local boolean &bResult;
+   Local string &rptDSType;
+   
+   Local number &nOrigPSMessagesMode = %Session.PSMessagesMode;
+   %Session.PSMessagesMode = 1;
+   
+   rem rshw ICE 1849427000;
+   &bResult = True;
+   
+   try
+      /* get the report defn object */
+      &oRptDefn = create PSXP_RPTDEFNMANAGER:ReportDefn(&ReportName);
+      &oRptDefn.Get();
+      
+      rem rsh  ICE 1836783000;
+      /* set Debug to True to leave debug files under process scheduler domain, default value is False*/
+      &oRptDefn.Debug = False;
+      
+      
+      /* set UseBurstValueAsOutputFileName to name bursted report using burst values, default is false. 
+		If Descriptive name is set (&Report.Userfilename), it will override this setting*/
+      If Not &OnlineFlag Then
+         &oRptDefn.UseBurstValueAsOutputFileName = True; /*set to true to use the burst value in the file name*/
+      End-If;
+      
+      
+      /* set file path only for file output type - other types use default temporary location */
+      If Not &OnlineFlag Then
+         If %OutDestType = 2 Then /* file */
+            
+            /* set BurstValueAsOutSubDir to true to use burst value as folder names for bursted files. 
+			This should be used only when OutDestinationType is File. Default value is false*/
+            &oRptDefn.BurstValueAsOutSubDir = False;
+            
+            &oRptDefn.OutDestination = %FilePath;
+         End-If;
+      End-If;
+      
+      If Not &OnlineFlag Then
+         /* fill prompt */
+         If All(&PromptRec) Then
+            &rcdQryPrompts = &oRptDefn.GetPSQueryPromptRecord();
+            If Not &rcdQryPrompts = Null Then
+               &rcdQryRunParms = CreateRecord(@("Record." | &PromptRec));
+               &rcdQryRunParms.OPRID.Value = %OperatorId;
+               &rcdQryRunParms.RUN_CNTL_ID.Value = &RunControlId;
+               &rcdQryRunParms.SelectByKey();
+               &rcdQryRunParms.CopyFieldsTo(&rcdQryPrompts);
+               &oRptDefn.SetPSQueryPromptRecord(&rcdQryPrompts);
+            End-If;
+         Else
+            &rcdQryPrompts = &oRptDefn.GetPSQueryPromptRecord();
+            &rcdQryPrompts.RUN_CNTL_ID.Value = &RunControlId;
+            &oRptDefn.SetPSQueryPromptRecord(&rcdQryPrompts);
+         End-If;
+      Else
+         &rcdQryPrompts = &oRptDefn.GetPSQueryPromptRecord();
+         &ContextRecord.CopyFieldsTo(&rcdQryPrompts);
+         &oRptDefn.SetPSQueryPromptRecord(&rcdQryPrompts);
+      End-If;
+      
+      If Not &OnlineFlag Then
+         &oRptDefn.ProcessInstance = &ProcessInstance; /*mdu XXX */
+      End-If;
+      &oRptDefn.ProcessReport(&TemplateId, "ENG", &AsOfDate, &oRptDefn.GetOutDestFormatString(&OutDestFormat));
+      
+      
+      /* code for debugging 2 tier AE */
+      /* &oRptDefn.ProcessReport("", "ENG", %Date, "HTM"); */
+      
+      
+      /* publish */
+      If &OnlineFlag Then
+         CommitWork();
+         &oRptDefn.DisplayOutput();
+      Else
+         If %OutDestType = 6 Then /* Web */
+            &oRptDefn.Publish("", "", "", &ProcessInstance);
+            
+         Else
+            If %OutDestType = 3 Then /* Printer */
+               &oRptDefn.PrintOutput(%FilePath);
+            Else
+               If %OutDestType = 5 Then /* Email */
+                  &bResult = &oRptDefn.EmailOutput(&ProcessInstance);
+               End-If;
+            End-If;
+         End-If;
+      End-If;
+      
+      
+   catch Exception &Err
+      rem rsh ICE 1836783000;
+      If Not &oRptDefn = Null Then
+         &oRptDefn.Close();
+      End-If;
+      WriteToLog(%ApplicationLogFence_Error, &Err.ToString());
+      
+      rem rsh: Outpout exception message to to Message Log;
+      &Err.Output();
+      Return False;
+   end-try;
+   rem rshw ICE 1849427000;
+   If &bResult = False Then
+      &oRptDefn.Close();
+   End-If;
+   
+   
+   %Session.PSMessagesMode = &nOrigPSMessagesMode;
+   
+   
+   /* check session message for errors */
+   If %Session.PSmessages.Count > 0 Then
+      &PSMessages = %Session.PSmessages;
+      For &i = 1 To &PSMessages.Count
+         If (&PSMessages.Item(&i).MessageType <= 1) Then
+            &MsgSetNbr = &PSMessages.Item(&i).MessageSetNumber;
+            &MsgNbr = &PSMessages.Item(&i).MessageNumber;
+            WriteToLog(%ApplicationLogFence_Error, MsgGet(&MsgSetNbr, &MsgNbr, "Message Not Found : " | &MsgSetNbr | "," | &MsgNbr));
+            &bResult = False;
+            Break;
+         End-If;
+      End-For;
+   End-If;
+   
+   Return &bResult;
+End-Function;
+
+/*It runs the BIP with a XML as source*/
+Function ExecXmlpReport(&ProcessInstance As number, &strFileName As string, &ReportName As string, &TemplateId As string, &AsOfDate As date, &OutDestFormat As number, &OnlineFlag As boolean) Returns boolean
+   Local PSXP_RPTDEFNMANAGER:ReportDefn &oRptDefn;
+   Local ApiObject &PSMessages;
+   Local number &MsgSetNbr, &MsgNbr;
+   Local number &i;
+   Local boolean &bResult;
+   
+   Local number &nOrigPSMessagesMode = %Session.PSMessagesMode;
+   %Session.PSMessagesMode = 1;
+   
+   rem rshw ICE 1849427000;
+   &bResult = True;
+   
+   try
+      /* get the report defn object */
+      &oRptDefn = create PSXP_RPTDEFNMANAGER:ReportDefn(&ReportName);
+      &oRptDefn.Get();
+      
+      rem rsh  ICE 1836783000;
+      /* set Debug to True to leave debug files under process scheduler domain, default value is False*/
+      &oRptDefn.Debug = False;
+      
+      
+      /* set UseBurstValueAsOutputFileName to name bursted report using burst values, default is false. 
+		If Descriptive name is set (&Report.Userfilename), it will override this setting*/
+      If Not &OnlineFlag Then
+         &oRptDefn.UseBurstValueAsOutputFileName = True; /*set to true to use the burst value in the file name*/
+      End-If;
+      
+      
+      /* set file path only for file output type - other types use default temporary location */
+      If Not &OnlineFlag Then
+         If %OutDestType = 2 Then /* file */
+            /* set BurstValueAsOutSubDir to true to use burst value as folder names for bursted files. 
+			This should be used only when OutDestinationType is File. Default value is false*/
+            &oRptDefn.BurstValueAsOutSubDir = False;
+            &oRptDefn.OutDestination = %FilePath;
+         End-If;
+      End-If;
+      
+      /* pass XMLFile to the report definition */
+      &oRptDefn.SetRuntimeDataXMLFile(&strFileName);
+      
+      If Not &OnlineFlag Then
+         &oRptDefn.ProcessInstance = &ProcessInstance; /*mdu XXX */
+      End-If;
+      
+      /*generate report*/
+      &oRptDefn.ProcessReport(&TemplateId, "ENG", &AsOfDate, &oRptDefn.GetOutDestFormatString(&OutDestFormat));
+      
+      /* publish */
+      If &OnlineFlag Then
+         CommitWork();
+         &oRptDefn.DisplayOutput();
+      Else
+         If %OutDestType = 6 Then /* Web */
+            &oRptDefn.Publish("", "", "", &ProcessInstance);
+         Else
+            If %OutDestType = 3 Then /* Printer */
+               &oRptDefn.PrintOutput(%FilePath);
+            Else
+               If %OutDestType = 5 Then /* Email */
+                  &bResult = &oRptDefn.EmailOutput(&ProcessInstance);
+               End-If;
+            End-If;
+         End-If;
+      End-If;
+      
+   catch Exception &Err
+      rem rsh ICE 1836783000;
+      If Not &oRptDefn = Null Then
+         &oRptDefn.Close();
+      End-If;
+      WriteToLog(%ApplicationLogFence_Error, &Err.ToString());
+      
+      rem rsh: Outpout exception message to to Message Log;
+      &Err.Output();
+      Return False;
+   end-try;
+   rem rshw ICE 1849427000;
+   If &bResult = False Then
+      &oRptDefn.Close();
+   End-If;
+   
+   %Session.PSMessagesMode = &nOrigPSMessagesMode;
+   
+   /* check session message for errors */
+   If %Session.PSmessages.Count > 0 Then
+      &PSMessages = %Session.PSmessages;
+      For &i = 1 To &PSMessages.Count
+         If (&PSMessages.Item(&i).MessageType <= 1) Then
+            &MsgSetNbr = &PSMessages.Item(&i).MessageSetNumber;
+            &MsgNbr = &PSMessages.Item(&i).MessageNumber;
+            WriteToLog(%ApplicationLogFence_Error, MsgGet(&MsgSetNbr, &MsgNbr, "Message Not Found : " | &MsgSetNbr | "," | &MsgNbr));
+            &bResult = False;
+            Break;
+         End-If;
+      End-For;
+   End-If;
+   
+   Return &bResult;
+End-Function;
+
