@@ -1,0 +1,77 @@
+/* Set Run Control Fields */
+Local Record &recSourceRun, &recTargetRun;
+
+&recSourceRun = CreateRecord(Record.OX_RUN);
+&recSourceRun.OPRID.Value = %OperatorId;
+&recSourceRun.RUN_CNTL_ID.Value = OX_BIP_AET.RUN_CNTL_ID;
+&recSourceRun.SelectByKey();
+
+&recTargetRun = CreateRecord(Record.OX_RUN_BIP);
+&recTargetRun.OPRID.Value = %OperatorId;
+&recTargetRun.RUN_CNTL_ID.Value = OX_BIP_AET.RUN_CNTL_ID;
+&recTargetRun.SelectByKey();
+
+&recSourceRun.CopyFieldsTo(&recTargetRun);
+&recTargetRun.DEPTID.Value = &recSourceRun.DEPTID_D.Value;
+&recTargetRun.BILL_TO_CUST_ID.Value = &recSourceRun.CUST_ID.Value;
+&recTargetRun.CUST_ID.Value = &recSourceRun.CUST_ID.Value;
+&recTargetRun.OX_PROD3_DESCR.Value = "%";
+&recTargetRun.ASSIGNMENT_ID.Value = &recSourceRun.CONTRACT_NUM.Value;
+&recTargetRun.CUSTOMER_TYPE.Value = "%";
+&recTargetRun.DESCRSHORT.Value = "%";
+
+
+/* Run Query and insert into OXPC008_IPE */
+Local Rowset &qryRowSet;
+Local Row &qryRow;
+Local Record &qryPromptRec, &aRec, &recOXOHBWSMRYDT;
+Local ApiObject &aRunQry, &QrySelOutputFldCol;
+Local Field &qryField, &recField;
+Local number &i, &j;
+&aRunQry = %Session.GetQuery();
+If Not (&aRunQry.Open("OX_OHBW_SUMMARY01", False, False) <> 0) Then
+   &qryPromptRec = &aRunQry.PromptRecord;
+   &recTargetRun.CopyFieldsTo(&qryPromptRec);
+   If &qryPromptRec <> Null Then
+      &qryRowSet = &aRunQry.RunToRowset(&qryPromptRec, 0);
+      If &qryRowSet <> Null Then
+         &aRec = &qryRowSet(1).GetRecord(1);
+         /* Insert query Field names */
+         &QrySelOutputFldCol = &aRunQry.QuerySelect.QueryOutputFields;
+         /* Get fieldnames of OXPC008_IPE, so then they can be processed in order */
+         Local array of array of string &aofQryFieldNames;
+         Local array of string &aosMapField;
+         &aofQryFieldNames = CreateArrayRept(&aosMapField, 0);
+         For &i = 1 To &QrySelOutputFldCol.count
+            Local string &strQryFieldMap = &QrySelOutputFldCol.Item(&i).HeadingUniqueFieldName;
+            Local string &strRecFieldMap;
+            SQLExec("SELECT OA_CONFIG_STR1 FROM PS_OA_CONFIG_DTL WHERE OA_CONFIG_ID='OXOHBW_SUMMARY_RPT_MAP' AND OA_CONFIG_PROPERTY=:1", &strQryFieldMap, &strRecFieldMap);
+            &aosMapField = CreateArray(&strQryFieldMap, &strRecFieldMap);
+            &aofQryFieldNames.Push(&aosMapField);
+         End-For;
+         If &qryRowSet.RowCount > 0 Then
+            For &i = 1 To &qryRowSet.RowCount
+               &aRec = &qryRowSet(&i).GetRecord(1);
+               &recOXOHBWSMRYDT = CreateRecord(Record.OXHOBWSMRY_DT);
+               For &j = 1 To &aRec.FieldCount
+                  &strRecFieldMap = &aofQryFieldNames [&j][2];
+                  If All(&strRecFieldMap) Then
+                     &qryField = &aRec.GetField(&j);
+                     &recField = &recOXOHBWSMRYDT.GetField(@("Field." | &strRecFieldMap));
+                     &recField.Value = &qryField.Value;
+                  End-If;
+               End-For;
+               If All(&recOXOHBWSMRYDT.GetField(1).Value) Then
+                  &recOXOHBWSMRYDT.Insert();
+               End-If;
+            End-For;
+         Else
+            /* "No records retrieved."; */
+         End-If;
+      Else
+         Error "Failed to retrieve result set";
+      End-If;
+   End-If;
+Else
+   Error "Error in opening query";
+End-If;
